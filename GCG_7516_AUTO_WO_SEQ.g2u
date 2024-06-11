@@ -1,0 +1,61 @@
+﻿Program.Sub.Preflight.Start
+Program.External.Include.Library("6008.lib")
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+'May 2024
+'Developer: Angel Tudon
+'Customer: SUHM Spring Works
+'Ticket: https://www.gss-service.com/Calls/CallEditInternalOpen/1446369
+'Project will automatically add a predetermined labor sequence too all WOs generated from the Gen WO button in the Sales Order Lines screen
+
+Function.Intrinsic.UI.UsePixels ' Allows you to use Pixels instead of Twips throughout
+
+V.Local.sCallerPrgm.Declare(String)
+V.Local.sJob.Declare(String)
+V.Local.sSuffix.Declare(String)
+V.Local.sSql.Declare(String)
+V.Local.sRet.Declare(String)
+
+F.Intrinsic.Control.SelectCase(V.Caller.Hook)
+
+	'Flag Global variable to validate a job is being created from the Gen WO button in Order Lines screen
+	F.Intrinsic.Control.Case(12340)
+		V.Passed.GLOBAL.Set("FromWOGen")
+		
+	'Post-process on job scheduling screen
+	F.Intrinsic.Control.Case(16800)
+		'Validate job is being generated from Gen WO button from Order Lines screen
+		F.Intrinsic.Control.If(V.Passed.GLOBAL, <>, "FromWOGen")
+			F.Intrinsic.Control.End
+		F.Intrinsic.Control.EndIf
+		
+		'Open ODBC connection
+		F.ODBC.Connection!con.OpenCompanyConnection
+		
+		'Capture job-suffix
+		V.Local.sJob.Set(V.Passed.009000)
+		V.Local.sSuffix.Set(V.Passed.009001)
+		
+		'Validate job-suffix exists, end program if not
+		F.Intrinsic.String.Build("Select JOB from V_JOB_HEADER where JOB = '{0}' and SUFFIX = '{1}'", V.Local.sJob, V.Local.sSuffix, V.Local.sSql)
+		F.ODBC.Connection!con.ExecuteAndReturn(v.Local.sSql, V.Local.sRet)
+		F.Intrinsic.Control.If(V.Ambient.ExecuteAndReturnEOF, =, True)
+			F.Intrinsic.Control.End
+		F.Intrinsic.Control.EndIf
+		
+		'Popuate 6008.lib datatable to add 992000 sequence to job
+		F.Data.Datatable.AddRow("6008", "WONo", V.Local.sJob.Trim, "Suffix", V.Local.sSuffix.Trim, "Seq", "992000", "LMO", "L", "OpDesc", "PARTS ACCOUNTABILITY", "PWC", "ZIND", "Unit", "0")
+		
+		'Call lib 6008 to update the job
+		F.Intrinsic.Control.CallSub(6008Sync)
+		F.Intrinsic.Control.End
+		
+F.Intrinsic.Control.EndSelect
+
+Program.Sub.Main.End
+
+Program.Sub.Comments.Start
+${$5$}$20.1.8286.22461$}$1
+${$6$}$Angel$}$20240603153117108$}$KXl0r/FkrMYwb/r4ukQ87f+Hs/x2T/ur3XvztYRcYbDsl3e/BZPtFNpR7vyevsuufLzzx7p01FM=
+Program.Sub.Comments.End
